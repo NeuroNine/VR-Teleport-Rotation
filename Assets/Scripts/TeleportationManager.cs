@@ -3,28 +3,33 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
-
+[RequireComponent(typeof(TeleportationProvider))]
 public class TeleportationManager : MonoBehaviour
 {
-    [SerializeField] private InputActionAsset actionAsset;
-    [SerializeField] private XRRayInteractor xrRayInteractor;
-    [SerializeField] private TeleportationProvider provider;
-
+    [BoxGroup("XR")] [SerializeField] private XRRayInteractor xrRayInteractor;
+    
+    [BoxGroup("Input")] [SerializeField] private InputActionAsset actionAsset;
+    
     [BoxGroup("Player Attributes")] [SerializeField]
     private new Transform camera;
-
+    
     [BoxGroup("Debug")] [SerializeField] private bool debugOn;
     [BoxGroup("Debug")] [SerializeField] private TMP_Text angleText;
     [BoxGroup("Debug")] [SerializeField] private TMP_Text rotationText;
+
+    private TeleportationProvider _teleportationProvider;
+    private bool _isTeleportActive;
     private InputAction _thumbstick;
-    private bool _isActive;
     private Vector2 _thumbstickDirection;
+
 
     // Start is called before the first frame update
     private void Start()
     {
+        SetDebug();
         TurnOffTeleport();
-        CheckDebugValue();
+
+        _teleportationProvider = GetComponent<TeleportationProvider>(); 
         
         var inputActionMap = actionAsset.FindActionMap("XRI LeftHand");
 
@@ -43,24 +48,23 @@ public class TeleportationManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        CheckDebugValue();
+        SetDebug();
         SetRotationText();
-        
-        if (!_isActive)
+
+        if (!_isTeleportActive)
         {
             return;
         }
 
         if (_thumbstick.triggered)
         {
-            Vector2 thumbstickValue = _thumbstick.ReadValue<Vector2>();
+            var thumbstickValue = _thumbstick.ReadValue<Vector2>();
             // if the thumbstick is pushed far enough in any direction we'll
             // save it off for use in the rotation angle calculation.
             if (thumbstickValue.sqrMagnitude >= 1)
             {
                 _thumbstickDirection = thumbstickValue.normalized;
             }
-
             return;
         }
 
@@ -79,14 +83,14 @@ public class TeleportationManager : MonoBehaviour
             matchOrientation = MatchOrientation.TargetUpAndForward
         };
 
-        provider.QueueTeleportRequest(request);
+        _teleportationProvider.QueueTeleportRequest(request);
         TurnOffTeleport();
     }
 
     private void OnTeleportActivate(InputAction.CallbackContext callbackContext)
     {
         xrRayInteractor.enabled = true;
-        _isActive = true;
+        _isTeleportActive = true;
     }
 
     private void OnTeleportCancel(InputAction.CallbackContext callbackContext)
@@ -97,7 +101,7 @@ public class TeleportationManager : MonoBehaviour
     private void TurnOffTeleport()
     {
         xrRayInteractor.enabled = false;
-        _isActive = false;
+        _isTeleportActive = false;
         _thumbstickDirection = Vector2.zero;
     }
 
@@ -112,13 +116,11 @@ public class TeleportationManager : MonoBehaviour
         var thumbstickAngle = Mathf.Atan2(_thumbstickDirection.x,
                                   _thumbstickDirection.y)
                               * Mathf.Rad2Deg;
-        var cameraYAngle = camera.eulerAngles.y;
         SetAngleText(thumbstickAngle);
-
-        return thumbstickAngle + cameraYAngle;
+        return thumbstickAngle + camera.eulerAngles.y;
     }
 
-    private void CheckDebugValue()
+    private void SetDebug()
     {
         rotationText.gameObject.SetActive(debugOn);
         angleText.gameObject.SetActive(debugOn);
